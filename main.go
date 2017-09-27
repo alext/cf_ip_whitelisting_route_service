@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 )
 
 func main() {
@@ -14,10 +16,24 @@ func main() {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
-	proxy := NewAuthProxy()
-
-	err := http.ListenAndServe(addr, proxy)
+	ipset, err := NewIPSet(strings.Split(os.Getenv("WHITELIST_ADDRS"), ","))
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	xffOffset, err := parseXFFOffset(os.Getenv("XFF_OFFSET"))
+
+	proxy := NewAuthProxy(ipset, xffOffset)
+
+	err = http.ListenAndServe(addr, proxy)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func parseXFFOffset(input string) (int, error) {
+	if input == "" {
+		return 0, nil
+	}
+	return strconv.Atoi(input)
 }

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 )
 
 const (
@@ -11,12 +12,16 @@ const (
 )
 
 type AuthProxy struct {
-	backend http.Handler
+	ipset     *IPSet
+	xffOffset int
+	backend   http.Handler
 }
 
-func NewAuthProxy() http.Handler {
+func NewAuthProxy(ipset *IPSet, xffOffset int) *AuthProxy {
 	return &AuthProxy{
-		backend: buildBackendProxy(),
+		ipset:     ipset,
+		xffOffset: xffOffset,
+		backend:   buildBackendProxy(),
 	}
 }
 
@@ -41,8 +46,8 @@ func buildBackendProxy() http.Handler {
 }
 
 func (a *AuthProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	//TODO actual auth.
-	if false {
+	reqIP := extractRequestIP(req, a.xffOffset)
+	if !a.ipset.Contains(reqIP) {
 		w.Header().Set("WWW-Authenticate", `Basic realm="auth"`)
 		http.Error(w, "Unauthorized.", http.StatusUnauthorized)
 		return
@@ -60,4 +65,22 @@ func (a *AuthProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	a.backend.ServeHTTP(w, req)
+}
+
+func extractRequestIP(req *http.Request, xffOffset int) string {
+	xff := req.Header.Get("X-Forwarded-For")
+	entriesWithBlanks := strings.Split(xff, " ")
+
+	entries := entriesWithBlanks[:0]
+	for _, ip := range entriesWithBlanks {
+		if ip != "" {
+			entries = append(entries, ip)
+		}
+	}
+
+	if len(entries) < xffOffset+1 {
+		return ""
+	}
+
+	return entries[len(entries)-1-xffOffset]
 }

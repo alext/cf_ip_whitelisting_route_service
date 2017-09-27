@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 )
@@ -13,14 +14,16 @@ import (
 var _ = Describe("Basic Auth proxy", func() {
 
 	var (
-		proxy    http.Handler
+		proxy    *AuthProxy
 		backend  *ghttp.Server
 		req      *http.Request
 		response *httptest.ResponseRecorder
 	)
 
 	BeforeEach(func() {
-		proxy = NewAuthProxy()
+		ipset, err := NewIPSet([]string{"10.0.0.0/24"})
+		Expect(err).NotTo(HaveOccurred())
+		proxy = NewAuthProxy(ipset, 0)
 		backend = ghttp.NewServer()
 		backend.AllowUnhandledRequests = true
 		backend.UnhandledRequestStatusCode = http.StatusOK
@@ -43,7 +46,10 @@ var _ = Describe("Basic Auth proxy", func() {
 			proxy.ServeHTTP(response, req)
 		})
 
-		Context("with hardcoded auth pass", func() {
+		Context("with an IP in the whitelist", func() {
+			BeforeEach(func() {
+				req.Header.Set("X-Forwarded-For", "10.0.0.3")
+			})
 
 			It("should proxy the request to the backend", func() {
 				Expect(response.Code).To(Equal(http.StatusOK))
@@ -76,7 +82,10 @@ var _ = Describe("Basic Auth proxy", func() {
 			})
 		})
 
-		PContext("when auth fails", func() {
+		Context("with a non whitelisted IP", func() {
+			BeforeEach(func() {
+				req.Header.Set("X-Forwarded-For", "192.168.0.1")
+			})
 
 			It("returns a 401 Unauthorized", func() {
 				Expect(response.Code).To(Equal(http.StatusUnauthorized))
@@ -87,5 +96,32 @@ var _ = Describe("Basic Auth proxy", func() {
 				Expect(backend.ReceivedRequests()).To(HaveLen(0))
 			})
 		})
+
+		DescribeTable("authorization rules",
+			func(xffHeader string, offset int, expectAuthorized bool) {
+				req.Header.Set("X-Forwarded-For", xffHeader)
+				proxy.xffOffset = offset
+
+				response = httptest.NewRecorder()
+				proxy.ServeHTTP(response, req)
+
+				if expectAuthorized {
+					Expect(response.Code).To(Equal(200))
+				} else {
+					Expect(response.Code).To(Equal(401))
+				}
+			},
+			Entry("an IP in the whitelist", "10.0.0.1", 0, true),
+			Entry("an IP in the whitelist with additional entries", "192.0.2.5 10.0.0.1", 0, true),
+			Entry("an IP not in the whitelist", "192.168.0.1", 0, false),
+			Entry("an IP not in the whitelist with additional entries", "192.0.2.5 192.168.0.1", 0, false),
+			Entry("whitelisted IP in the wrong place in XFF", "10.0.0.1 192.168.0.1", 0, false),
+			Entry("whitelisted IP with an offset", "10.0.0.1 192.168.0.1", 1, true),
+			Entry("whitelisted IP with an offset and additional entries", "192.0.2.5 10.0.0.1 192.168.0.1", 1, true),
+			Entry("offset beyond start of XFF header", "10.0.0.1", 1, false),
+			Entry("offset well beyond start of XFF header", "10.0.0.1", 4, false),
+			Entry("empty XFF header", "", 0, false),
+			Entry("extra spaces in XFF header", "10.0.0.1  192.168.0.1", 1, true),
+		)
 	})
 })
