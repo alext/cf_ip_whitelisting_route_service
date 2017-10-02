@@ -16,7 +16,7 @@ func main() {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
-	ipset, err := NewIPSet(strings.Split(os.Getenv("WHITELIST_ADDRS"), ","))
+	ipset, err := NewIPSet(parseWhitelistAddrs(os.Getenv("WHITELIST_ADDRS")))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -29,6 +29,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func parseWhitelistAddrs(input string) []string {
+	if strings.TrimSpace(input) == "" {
+		return []string{}
+	}
+	addrs := strings.Split(input, ",")
+	for i, addr := range addrs {
+		addrs[i] = strings.TrimSpace(addr)
+	}
+	return addrs
 }
 
 func parseXFFOffset(input string) (int, error) {
