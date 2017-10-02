@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -48,6 +49,7 @@ func buildBackendProxy() http.Handler {
 func (a *AuthProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	reqIP := extractRequestIP(req, a.xffOffset)
 	if !a.ipset.Contains(reqIP) {
+		log.Printf("Denied access for IP '%s' (X-Forwarded-For: %s)", reqIP, req.Header.Get("X-Forwarded-For"))
 		http.Error(w, "Permission denied.", 403)
 		return
 	}
