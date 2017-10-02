@@ -111,16 +111,16 @@ var _ = Describe("Basic Auth proxy", func() {
 				}
 			},
 			Entry("an IP in the whitelist", "10.0.0.1", 0, true),
-			Entry("an IP in the whitelist with additional entries", "192.0.2.5 10.0.0.1", 0, true),
+			Entry("an IP in the whitelist with additional entries", "192.0.2.5, 10.0.0.1", 0, true),
 			Entry("an IP not in the whitelist", "192.168.0.1", 0, false),
-			Entry("an IP not in the whitelist with additional entries", "192.0.2.5 192.168.0.1", 0, false),
-			Entry("whitelisted IP in the wrong place in XFF", "10.0.0.1 192.168.0.1", 0, false),
-			Entry("whitelisted IP with an offset", "10.0.0.1 192.168.0.1", 1, true),
-			Entry("whitelisted IP with an offset and additional entries", "192.0.2.5 10.0.0.1 192.168.0.1", 1, true),
+			Entry("an IP not in the whitelist with additional entries", "192.0.2.5, 192.168.0.1", 0, false),
+			Entry("whitelisted IP in the wrong place in XFF", "10.0.0.1, 192.168.0.1", 0, false),
+			Entry("whitelisted IP with an offset", "10.0.0.1, 192.168.0.1", 1, true),
+			Entry("whitelisted IP with an offset and additional entries", "192.0.2.5, 10.0.0.1, 192.168.0.1", 1, true),
 			Entry("offset beyond start of XFF header", "10.0.0.1", 1, false),
 			Entry("offset well beyond start of XFF header", "10.0.0.1", 4, false),
 			Entry("empty XFF header", "", 0, false),
-			Entry("extra spaces in XFF header", "10.0.0.1  192.168.0.1", 1, true),
+			Entry("extra spaces in XFF header", "10.0.0.1,  192.168.0.1", 1, true),
 		)
 	})
 })

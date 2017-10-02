@@ -68,10 +68,11 @@ func (a *AuthProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 func extractRequestIP(req *http.Request, xffOffset int) string {
 	xff := req.Header.Get("X-Forwarded-For")
-	entriesWithBlanks := strings.Split(xff, " ")
+	entriesWithBlanks := strings.Split(xff, ",")
 
 	entries := entriesWithBlanks[:0]
 	for _, ip := range entriesWithBlanks {
+		ip = strings.TrimSpace(ip)
 		if ip != "" {
 			entries = append(entries, ip)
 		}
