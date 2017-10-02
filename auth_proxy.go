@@ -48,8 +48,7 @@ func buildBackendProxy() http.Handler {
 func (a *AuthProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	reqIP := extractRequestIP(req, a.xffOffset)
 	if !a.ipset.Contains(reqIP) {
-		w.Header().Set("WWW-Authenticate", `Basic realm="auth"`)
-		http.Error(w, "Unauthorized.", http.StatusUnauthorized)
+		http.Error(w, "Permission denied.", 403)
 		return
 	}
 

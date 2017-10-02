@@ -87,9 +87,8 @@ var _ = Describe("Basic Auth proxy", func() {
 				req.Header.Set("X-Forwarded-For", "192.168.0.1")
 			})
 
-			It("returns a 401 Unauthorized", func() {
-				Expect(response.Code).To(Equal(http.StatusUnauthorized))
-				Expect(response.Header().Get("WWW-Authenticate")).To(Equal(`Basic realm="auth"`))
+			It("returns a 403", func() {
+				Expect(response.Code).To(Equal(403))
 			})
 
 			It("does not make a request to the backend", func() {
@@ -108,7 +107,7 @@ var _ = Describe("Basic Auth proxy", func() {
 				if expectAuthorized {
 					Expect(response.Code).To(Equal(200))
 				} else {
-					Expect(response.Code).To(Equal(401))
+					Expect(response.Code).To(Equal(403))
 				}
 			},
 			Entry("an IP in the whitelist", "10.0.0.1", 0, true),
