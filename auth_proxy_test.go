@@ -23,7 +23,7 @@ var _ = Describe("Basic Auth proxy", func() {
 	BeforeEach(func() {
 		ipset, err := NewIPSet([]string{"10.0.0.0/24"})
 		Expect(err).NotTo(HaveOccurred())
-		proxy = NewAuthProxy(ipset, 0)
+		proxy = NewAuthProxy(ipset, nil)
 		backend = ghttp.NewServer()
 		backend.AllowUnhandledRequests = true
 		backend.UnhandledRequestStatusCode = http.StatusOK
@@ -97,9 +97,9 @@ var _ = Describe("Basic Auth proxy", func() {
 		})
 
 		DescribeTable("authorization rules",
-			func(xffHeader string, offset int, expectAuthorized bool) {
+			func(xffHeader string, trustedRouters []string, expectAuthorized bool) {
 				req.Header.Set("X-Forwarded-For", xffHeader)
-				proxy.xffOffset = offset
+				proxy.setTrustedRouters(trustedRouters)
 
 				response = httptest.NewRecorder()
 				proxy.ServeHTTP(response, req)
@@ -110,17 +110,16 @@ var _ = Describe("Basic Auth proxy", func() {
 					Expect(response.Code).To(Equal(403))
 				}
 			},
-			Entry("an IP in the whitelist", "10.0.0.1", 0, true),
-			Entry("an IP in the whitelist with additional entries", "192.0.2.5, 10.0.0.1", 0, true),
-			Entry("an IP not in the whitelist", "192.168.0.1", 0, false),
-			Entry("an IP not in the whitelist with additional entries", "192.0.2.5, 192.168.0.1", 0, false),
-			Entry("whitelisted IP in the wrong place in XFF", "10.0.0.1, 192.168.0.1", 0, false),
-			Entry("whitelisted IP with an offset", "10.0.0.1, 192.168.0.1", 1, true),
-			Entry("whitelisted IP with an offset and additional entries", "192.0.2.5, 10.0.0.1, 192.168.0.1", 1, true),
-			Entry("offset beyond start of XFF header", "10.0.0.1", 1, false),
-			Entry("offset well beyond start of XFF header", "10.0.0.1", 4, false),
-			Entry("empty XFF header", "", 0, false),
-			Entry("extra spaces in XFF header", "10.0.0.1,  192.168.0.1", 1, true),
+			Entry("an IP in the whitelist", "10.0.0.1", nil, true),
+			Entry("an IP in the whitelist with additional entries", "192.0.2.5, 10.0.0.1", nil, true),
+			Entry("an IP not in the whitelist", "192.168.0.1", nil, false),
+			Entry("an IP not in the whitelist with additional entries", "192.0.2.5, 192.168.0.1", nil, false),
+			Entry("whitelisted IP with another IP ahead of it", "10.0.0.1, 192.168.0.1", nil, false),
+			Entry("whitelisted IP behind a trusted router", "10.0.0.1, 192.168.0.1", []string{"192.168.0.1"}, true),
+			Entry("whitelisted IP behind a trusted router with additional entries", "192.0.2.5, 10.0.0.1, 192.168.0.1", []string{"192.168.0.1"}, true),
+			Entry("only trusted routers in XFF header", "192.168.0.1", []string{"192.168.0.1"}, false),
+			Entry("empty XFF header", "", nil, false),
+			Entry("extra spaces in XFF header", "10.0.0.1,  192.168.0.1", []string{"192.168.0.1"}, true),
 		)
 	})
 })

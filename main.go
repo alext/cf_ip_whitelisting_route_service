@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -16,14 +15,14 @@ func main() {
 		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 
-	ipset, err := NewIPSet(parseWhitelistAddrs(os.Getenv("WHITELIST_ADDRS")))
+	ipset, err := NewIPSet(parseCommaSeparated(os.Getenv("WHITELIST_ADDRS")))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	xffOffset, err := parseXFFOffset(os.Getenv("XFF_OFFSET"))
+	trustedRouters := parseCommaSeparated(os.Getenv("TRUSTED_ROUTERS"))
 
-	proxy := NewAuthProxy(ipset, xffOffset)
+	proxy := NewAuthProxy(ipset, trustedRouters)
 
 	err = http.ListenAndServe(addr, proxy)
 	if err != nil {
@@ -31,7 +30,7 @@ func main() {
 	}
 }
 
-func parseWhitelistAddrs(input string) []string {
+func parseCommaSeparated(input string) []string {
 	if strings.TrimSpace(input) == "" {
 		return []string{}
 	}
@@ -40,11 +39,4 @@ func parseWhitelistAddrs(input string) []string {
 		addrs[i] = strings.TrimSpace(addr)
 	}
 	return addrs
-}
-
-func parseXFFOffset(input string) (int, error) {
-	if input == "" {
-		return 0, nil
-	}
-	return strconv.Atoi(input)
 }

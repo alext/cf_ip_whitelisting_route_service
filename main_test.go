@@ -5,20 +5,20 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("parseWhitelistAddrs", func() {
+var _ = Describe("parseCommaSeparated", func() {
 
 	It("splits the comma separated string", func() {
-		actual := parseWhitelistAddrs("10.0.0.1,192.168.42.0/24")
+		actual := parseCommaSeparated("10.0.0.1,192.168.42.0/24")
 		Expect(actual).To(Equal([]string{"10.0.0.1", "192.168.42.0/24"}))
 	})
 
 	It("strips leading and trailing whitespace in each entry", func() {
-		actual := parseWhitelistAddrs("10.0.0.1, 192.168.42.0/24")
+		actual := parseCommaSeparated("10.0.0.1, 192.168.42.0/24")
 		Expect(actual).To(Equal([]string{"10.0.0.1", "192.168.42.0/24"}))
 	})
 
 	It("returns an empty slice when given blank input", func() {
-		actual := parseWhitelistAddrs("")
+		actual := parseCommaSeparated("")
 		Expect(actual).To(Equal([]string{}))
 	})
 })

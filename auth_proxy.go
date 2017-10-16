@@ -13,16 +13,24 @@ const (
 )
 
 type AuthProxy struct {
-	ipset     *IPSet
-	xffOffset int
-	backend   http.Handler
+	ipset          *IPSet
+	trustedRouters map[string]bool
+	backend        http.Handler
 }
 
-func NewAuthProxy(ipset *IPSet, xffOffset int) *AuthProxy {
-	return &AuthProxy{
-		ipset:     ipset,
-		xffOffset: xffOffset,
-		backend:   buildBackendProxy(),
+func NewAuthProxy(ipset *IPSet, trustedRouters []string) *AuthProxy {
+	a := &AuthProxy{
+		ipset:   ipset,
+		backend: buildBackendProxy(),
+	}
+	a.setTrustedRouters(trustedRouters)
+	return a
+}
+
+func (a *AuthProxy) setTrustedRouters(routers []string) {
+	a.trustedRouters = make(map[string]bool)
+	for _, r := range routers {
+		a.trustedRouters[r] = true
 	}
 }
 
@@ -47,7 +55,7 @@ func buildBackendProxy() http.Handler {
 }
 
 func (a *AuthProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	reqIP := extractRequestIP(req, a.xffOffset)
+	reqIP := a.extractRequestIP(req)
 	if !a.ipset.Contains(reqIP) {
 		log.Printf("Denied access for IP '%s' (X-Forwarded-For: %s)", reqIP, req.Header.Get("X-Forwarded-For"))
 		http.Error(w, "Permission denied.", 403)
@@ -68,7 +76,7 @@ func (a *AuthProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	a.backend.ServeHTTP(w, req)
 }
 
-func extractRequestIP(req *http.Request, xffOffset int) string {
+func (a *AuthProxy) extractRequestIP(req *http.Request) string {
 	xff := req.Header.Get("X-Forwarded-For")
 	entriesWithBlanks := strings.Split(xff, ",")
 
@@ -80,9 +88,11 @@ func extractRequestIP(req *http.Request, xffOffset int) string {
 		}
 	}
 
-	if len(entries) < xffOffset+1 {
-		return ""
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
+		if !a.trustedRouters[entry] {
+			return entry
+		}
 	}
-
-	return entries[len(entries)-1-xffOffset]
+	return ""
 }
