@@ -6,5 +6,5 @@ applications:
    instances: 2
    buildpack: go_buildpack
    env:
-     GOVERSION: go1.8
+     GOVERSION: go1.10
      GOPACKAGENAME: github.com/alext/cf_ip_whitelisting_route_service
